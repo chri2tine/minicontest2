@@ -16,6 +16,7 @@ from captureAgents import CaptureAgent
 import random
 import util
 import distanceCalculator
+import time
 from game import Directions
 import game
 
@@ -26,6 +27,7 @@ import game
 
 def createTeam(firstIndex, secondIndex, isRed,
                first='OffensiveReflexAgent', second='DefensiveReflexAgent'):
+    #    first='DummyAgent', second='DummyAgent'):
     """
     This function should return a list of two agents that will form the
     team, initialized using firstIndex and secondIndex as their agent
@@ -84,7 +86,7 @@ class ReflexCaptureAgent(CaptureAgent):
                     bestAction = action
                     bestDist = dist
             return bestAction
-
+        # time.sleep(.01)
         return random.choice(bestActions)
 
     def getSuccessor(self, gameState, action):
@@ -134,25 +136,44 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
     def getFeatures(self, gameState, action):
         # can compute shortest path between any two points in the maze
         distancer = distanceCalculator.Distancer(gameState.data.layout)
-        distancer.getMazeDistances() 
+        distancer.getMazeDistances()
 
         features = util.Counter()
         successor = self.getSuccessor(gameState, action)
         foodList = self.getFood(successor).asList()
-        features['successorScore'] = -len(foodList)  # self.getScore(successor)
-        features['foodLeft'] = len(foodList)
+        features['foodLeft'] = -len(foodList)  # self.getScore(successor)
+
+        ghostsIdxs = self.getOpponents(successor)
+        ghostPositions = [successor.getAgentState(
+            ghost).getPosition() for ghost in ghostsIdxs]
+        ghostDists = [distancer.getDistance(successor.getAgentState(
+            self.index).getPosition(), ghostPos) for ghostPos in ghostPositions]
+        features['ghostDistance'] = min(ghostDists)
+        features['ghostNearby'] = 1 if min(ghostDists) < 5 else 0
 
         # Compute distance to the nearest food
-
         if len(foodList) > 0:  # This should always be True,  but better safe than sorry
             myPos = successor.getAgentState(self.index).getPosition()
             minDistance = min([self.getMazeDistance(myPos, food)
                               for food in foodList])
             features['distanceToFood'] = minDistance
+
+
+        capsules = self.getCapsules(successor)
+        capsuleDist = []  # to avoid division by 0
+        if len(capsules) == 0:
+            features['capsuleDist'] = 0
+        else:
+            for c in capsules:
+                capsuleDist.append(self.getMazeDistance(myPos, c))
+            features['capsuleDist'] = min(capsuleDist)
+        # print(f'offeature: {features}')
         return features
 
     def getWeights(self, gameState, action):
-        return {'successorScore': 100, 'distanceToFood': -1, 'foodLeft': -10}
+        # farther from ghost is better
+        # eating food is good
+        return {'foodLeft': 100, 'ghostDistance': 0, 'distanceToFood': -1, 'capsuleDist': -40, 'ghostNearby': -100}
 
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
@@ -192,7 +213,7 @@ class DefensiveReflexAgent(ReflexCaptureAgent):
             self.index).configuration.direction]
         if action == rev:
             features['reverse'] = 1
-
+        # print(f'defeature: {features}')
         return features
 
     def getWeights(self, gameState, action):
