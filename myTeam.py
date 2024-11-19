@@ -167,13 +167,30 @@ class OffensiveReflexAgent(ReflexCaptureAgent):
             for c in capsules:
                 capsuleDist.append(self.getMazeDistance(myPos, c))
             features['capsuleDist'] = min(capsuleDist)
-        # print(f'offeature: {features}')
+
+        # threshold
+        threshholdX = gameState.data.layout.width // 2
+        if gameState.isOnRedTeam(self.index):
+            threshholdX = threshholdX - 1
+        # draw a line down the middle of the board
+        middlePositions = [(threshholdX, y) for y in range(0, gameState.data.layout.height)]
+
+        numEaten = gameState.getAgentState(self.index).numCarrying
+        features['goHome'] = 50
+        features['homeUrgent'] = 0
+        if numEaten > 0:
+            targetDistances = []
+            for pos in middlePositions:
+                try: targetDistances.append(self.getMazeDistance(myPos, pos))
+                except: pass
+            distToCenter = min(targetDistances)
+            features['homeUrgent'] = distToCenter
         return features
 
     def getWeights(self, gameState, action):
         # farther from ghost is better
         # eating food is good
-        return {'foodLeft': 100, 'ghostDistance': 0, 'distanceToFood': -1, 'capsuleDist': -40, 'ghostNearby': -100}
+        return {'foodLeft': 100, 'ghostDistance': 0, 'distanceToFood': -1, 'capsuleDist': -40, 'ghostNearby': -100, 'homeUrgent': -100}
 
 
 class DefensiveReflexAgent(ReflexCaptureAgent):
